@@ -1,0 +1,511 @@
+# RuoYi-Vue-Plus AI 智能化项目 Git 忽略文件
+# ================================================================
+
+# ================================================================
+# Node.js / 前端相关
+# ================================================================
+
+# 依赖目录
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# 构建输出
+dist/
+dist-ssr/
+build/
+out/
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 覆盖率报告
+coverage/
+*.lcov
+.nyc_output/
+
+# Grunt 中间件和输出目录
+.grunt
+
+# Bower 依赖目录
+bower_components
+
+# ESLint 缓存
+.eslintcache
+
+# Stylelint 缓存
+.stylelintcache
+
+# Parcel-bundler 缓存
+.cache
+.parcel-cache
+
+# Next.js 构建输出
+.next
+
+# Nuxt.js 构建 / 生成输出
+.nuxt
+dist
+
+# Gatsby 文件
+.cache/
+public
+
+# Vuepress 构建输出
+.vuepress/dist
+
+# Serverless 目录
+.serverless/
+
+# FuseBox 缓存
+.fusebox/
+
+# DynamoDB Local 文件
+.dynamodb/
+
+# TernJS 端口文件
+.tern-port
+
+# Package-lock 文件 (使用 pnpm)
+package-lock.json
+yarn.lock
+
+# ================================================================
+# Java / 后端相关
+# ================================================================
+
+# Maven 构建输出
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Gradle 构建输出
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# STS (Spring Tool Suite)
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# IntelliJ IDEA
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# Java 编译文件
+*.class
+
+# JAR, WAR, EAR 文件
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# JVM 崩溃日志
+hs_err_pid*
+replay_pid*
+
+# 应用日志
+logs/
+*.log
+log/
+temp/
+
+# ================================================================
+# AI / 机器学习相关
+# ================================================================
+
+# 机器学习模型文件
+*.pkl
+*.h5
+*.hdf5
+*.pb
+*.onnx
+*.tflite
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# 向量数据库存储
+qdrant_storage/
+vector_db/
+embeddings/
+*.faiss
+*.index
+
+# 数据集和训练数据
+data/
+datasets/
+training_data/
+test_data/
+*.csv
+*.json
+*.jsonl
+*.parquet
+*.feather
+
+# AI模型输出
+model_outputs/
+generated/
+checkpoints/
+experiments/
+
+# Jupyter Notebook 检查点
+.ipynb_checkpoints
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Weights & Biases
+wandb/
+
+# Tensorboard 日志
+runs/
+tensorboard_logs/
+
+# HuggingFace 缓存
+.cache/huggingface/
+transformers_cache/
+
+# 向量化临时文件
+*.vectors
+*.emb
+*.txt.vectors
+
+# ================================================================
+# 环境配置和密钥文件
+# ================================================================
+
+# 环境变量文件
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# 数据库配置文件（包含敏感信息）
+application-*.yml
+!application-example.yml
+!application-dev.yml.example
+!application-prod.yml.example
+application.properties
+!application.properties.example
+
+# API 密钥和证书文件
+*.key
+*.pem
+*.p12
+*.jks
+*.keystore
+secrets/
+api_keys/
+credentials/
+
+# 配置文件备份
+*.backup
+*.bak
+*.orig
+
+# ================================================================
+# 数据库和缓存
+# ================================================================
+
+# H2 数据库文件
+*.h2.db
+*.trace.db
+*.lock.db
+
+# SQLite 数据库
+*.sqlite
+*.sqlite3
+*.db
+
+# Redis 持久化文件
+dump.rdb
+appendonly.aof
+
+# MySQL 备份文件
+*.sql.gz
+*.sql.bz2
+
+# 数据库迁移临时文件
+flyway/
+liquibase/
+
+# ================================================================
+# 操作系统相关
+# ================================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ================================================================
+# 临时文件和缓存
+# ================================================================
+
+# 通用临时文件
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.#*
+\#*#
+.*.swp
+.*.swo
+
+# 压缩文件
+*.7z
+*.dmg
+*.gz
+*.iso
+*.tar
+*.zip
+
+# 备份文件
+*.backup
+*.bak
+*.gho
+*.ori
+*.orig
+*.tmp
+
+# 缩略图
+*.jpg:large
+*.jpeg:large
+*.png:large
+*.gif:large
+
+# ================================================================
+# 监控和分析工具
+# ================================================================
+
+# Sonar
+.sonar/
+.scannerwork/
+
+# Jacoco
+jacoco.exec
+jacoco-ut.exec
+jacoco-it.exec
+
+# ================================================================
+# Docker 相关
+# ================================================================
+
+# Docker 构建缓存
+.dockerignore
+
+# Docker Compose 覆盖文件
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# ================================================================
+# 文档相关
+# ================================================================
+
+# 生成的文档
+/docs/build/
+/docs/.vuepress/dist/
+
+# API 文档
+api-docs/
+
+# ================================================================
+# 特殊项目文件
+# ================================================================
+
+# 上传文件目录
+upload/
+uploads/
+files/
+static/uploads/
+
+# 报表文件
+reports/
+*.xls
+*.xlsx
+*.doc
+*.docx
+*.pdf
+
+# 导入导出文件
+import/
+export/
+
+# 验证码图片
+captcha/
+
+# 头像和图片
+avatar/
+images/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+*.svg
+
+# 音视频文件
+*.mp3
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+
+# ================================================================
+# 测试相关
+# ================================================================
+
+# 测试输出
+/test-output/
+/test-results/
+
+# 性能测试结果
+*.jmx
+*.jtl
+
+# ================================================================
+# 自定义忽略 (项目特定)
+# ================================================================
+
+# 工作流临时文件
+workflow_temp/
+
+# 租户数据隔离文件
+tenant_*/
+
+# 代码生成临时文件
+generator_temp/
+generated_code/
+
+# 系统配置备份
+config_backup/
+
+# 插件开发文件
+plugins_dev/
+
+# 本地开发配置
+local_config/
+
+# ================================================================
+# 但是这些文件需要被跟踪
+# ================================================================
+
+# 确保这些重要文件被跟踪
+!.gitkeep
+!.gitignore
+!README.md
+!LICENSE
+!pom.xml
+!package.json
+!yarn.lock
+!pnpm-lock.yaml
+
+# 配置文件示例
+!application-example.yml
+!docker-compose.example.yml
+
+# 文档文件
+!docs/
+!*.md
+
+# 脚本文件
+!scripts/
+!*.sh
+!*.bat
+
+# 测试文件
+!src/test/
+!test/
+!tests/
+
+# 静态资源文件夹结构
+!public/.gitkeep
+!static/.gitkeep
+!assets/.gitkeep
+
+# END OF GITIGNORE
