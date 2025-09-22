@@ -48,6 +48,29 @@
         layout="vertical"
         class="login-form"
       >
+        <!-- 租户选择 -->
+        <a-form-item
+          name="tenantId"
+          :rules="[{ required: true, message: '请选择租户' }]"
+        >
+          <a-select
+            v-model:value="formData.tenantId"
+            placeholder="请选择租户"
+            size="large"
+            class="login-input"
+            :loading="tenantList.length === 0"
+          >
+            <a-select-option value="">请选择租户</a-select-option>
+            <a-select-option
+              v-for="tenant in tenantList"
+              :key="tenant.tenantId"
+              :value="tenant.tenantId"
+            >
+              {{ tenant.companyName }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+
         <!-- 用户名输入 -->
         <a-form-item
           name="username"
@@ -75,13 +98,34 @@
           />
         </a-form-item>
 
+        <!-- 验证码（如果需要） -->
+        <a-form-item v-if="captchaEnabled" name="code">
+          <div class="captcha-row">
+            <a-input
+              v-model:value="formData.code"
+              placeholder="请输入验证码"
+              size="large"
+              class="login-input captcha-input"
+            />
+            <img
+              :src="captchaImg"
+              alt="验证码"
+              class="captcha-img"
+              @click="refreshCaptcha"
+              title="点击刷新验证码"
+              v-if="captchaImg"
+            />
+          </div>
+        </a-form-item>
+
         <!-- 用户协议 -->
         <a-form-item>
-          <a-checkbox v-model:checked="agreeTerms" class="agree-checkbox">
-            已阅读并同意
-            <a href="#" @click.prevent="handleTermsClick" class="terms-link">用户协议</a>
-            <!-- <span @click="handleRegisterClick" class="register-link">立即注册</span> -->
-          </a-checkbox>
+          <div class="terms-and-links">
+            <a-checkbox v-model:checked="agreeTerms" class="agree-checkbox">
+              已阅读并同意
+              <a href="#" @click.prevent="handleTermsClick" class="terms-link">用户协议</a>
+            </a-checkbox>
+          </div>
         </a-form-item>
 
         <!-- 登录按钮 -->
@@ -141,6 +185,12 @@
         <span>技术支持由梧州市思捷科技网络有限公司提供</span>
       </div>
 
+      <!-- 调试信息 -->
+      <div class="debug-info" v-if="showDebugInfo && !scanMode">
+        <h4>调试信息</h4>
+        <pre>{{ debugData }}</pre>
+      </div>
+
        <!-- 用户协议弹窗 -->
        <a-modal
         v-model:open="agreementModalVisible"
@@ -183,10 +233,11 @@
  * 使用认证store进行登录处理
  */
 
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
+import { getTenantList, getCaptcha } from '@/api/auth'
 
 /**
  * 组件属性定义
@@ -224,6 +275,16 @@ const scanMode = ref(false)
 const showScanTip = ref(false)
 const showLoginCodeTip = ref(false)
 
+// 租户相关数据
+const tenantList = ref([])
+
+// 验证码相关数据
+const captchaEnabled = ref(false)
+const captchaImg = ref('')
+
+// 调试信息
+const showDebugInfo = ref(import.meta.env.VITE_APP_ENV === 'development')
+
 /**
  * 登录表单数据
  */
@@ -231,8 +292,22 @@ const formData = reactive({
   username: '',   // 用户名
   password: '',   // 密码
   code: '',       // 验证码
-  uuid: ''        // 验证码UUID
+  uuid: '',       // 验证码UUID
+  tenantId: import.meta.env.VITE_DEFAULT_TENANT_ID || '000000'    // 租户ID
 })
+
+// 调试数据
+const debugData = computed(() => ({
+  环境信息: {
+    clientId: import.meta.env.VITE_GLOB_APP_CLIENT_ID,
+    defaultTenantId: import.meta.env.VITE_DEFAULT_TENANT_ID,
+    apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+    env: import.meta.env.VITE_APP_ENV
+  },
+  登录表单: formData,
+  选择的租户: formData.tenantId,
+  租户列表: tenantList.value.map(t => ({ id: t.tenantId, name: t.companyName }))
+}))
 
 /**
  * 监听props变化，同步模态框显示状态
@@ -272,6 +347,16 @@ const handleLogin = async () => {
     return
   }
 
+  if (!formData.tenantId) {
+    message.warning('请选择租户')
+    return
+  }
+
+  if (captchaEnabled.value && !formData.code.trim()) {
+    message.warning('请输入验证码')
+    return
+  }
+
   loading.value = true
   try {
     // 调用认证store的登录方法
@@ -295,6 +380,12 @@ const handleLogin = async () => {
     
   } catch (error) {
     console.error('登录失败:', error)
+    
+    // 如果启用了验证码，登录失败后刷新验证码
+    if (captchaEnabled.value) {
+      await refreshCaptcha()
+    }
+    
     // 错误信息已经在authStore中处理并显示，这里不需要额外处理
     // 参考管理端的做法，让store负责错误提示的显示
   } finally {
@@ -377,6 +468,120 @@ const handleTermsClick = () => {
   // - 显示协议内容的模态框
   message.info('用户协议详情')
 }
+
+/**
+ * 获取租户列表
+ */
+const loadTenantList = async () => {
+  try {
+    const response = await getTenantList()
+    console.log('获取租户列表响应:', response)
+    
+    if (response && response.voList) {
+      tenantList.value = response.voList
+      
+      // 如果当前没有选择租户且有默认租户，自动选择
+      if (!formData.tenantId && tenantList.value.length > 0) {
+        const defaultTenant = tenantList.value.find(t => t.tenantId === '000000')
+        if (defaultTenant) {
+          formData.tenantId = defaultTenant.tenantId
+        } else {
+          formData.tenantId = tenantList.value[0].tenantId
+        }
+      }
+      
+      console.log('租户列表加载成功:', tenantList.value)
+    }
+  } catch (error) {
+    console.error('获取租户列表失败:', error)
+    message.warning('获取租户列表失败，将使用默认租户')
+    
+    // 设置默认租户信息
+    tenantList.value = [{
+      tenantId: '000000',
+      companyName: '默认租户'
+    }]
+    formData.tenantId = '000000'
+  }
+}
+
+/**
+ * 刷新租户列表
+ */
+const refreshTenantList = () => {
+  loadTenantList()
+}
+
+/**
+ * 初始化验证码功能
+ * 检查后端是否启用验证码并获取验证码
+ */
+const initCaptcha = async () => {
+  try {
+    const response = await getCaptcha()
+    console.log('初始化验证码响应:', response)
+    
+    if (response) {
+      // 根据后端返回的状态动态设置验证码启用状态
+      captchaEnabled.value = response.captchaEnabled !== false
+      
+      if (captchaEnabled.value && response.img) {
+        captchaImg.value = `data:image/jpeg;base64,${response.img}`
+        formData.uuid = response.uuid
+        console.log('验证码已启用并获取成功')
+      } else {
+        console.log('验证码功能已禁用')
+      }
+    }
+  } catch (error) {
+    console.error('初始化验证码失败:', error)
+    // 初始化失败时不显示错误提示，使用默认关闭状态
+    captchaEnabled.value = false
+  }
+}
+
+/**
+ * 获取验证码
+ */
+const refreshCaptcha = async () => {
+  if (!captchaEnabled.value) return
+  
+  try {
+    const response = await getCaptcha()
+    console.log('刷新验证码响应:', response)
+    
+    if (response && response.img) {
+      captchaImg.value = `data:image/jpeg;base64,${response.img}`
+      formData.uuid = response.uuid
+    }
+  } catch (error) {
+    console.error('获取验证码失败:', error)
+    message.error('获取验证码失败')
+  }
+}
+
+/**
+ * 切换验证码
+ */
+const toggleCaptcha = () => {
+  captchaEnabled.value = !captchaEnabled.value
+  if (captchaEnabled.value) {
+    refreshCaptcha()
+  } else {
+    captchaImg.value = ''
+    formData.code = ''
+    formData.uuid = ''
+  }
+}
+
+/**
+ * 组件挂载时初始化
+ */
+onMounted(() => {
+  console.log('LoginModal 组件挂载，开始初始化...')
+  loadTenantList()
+  initCaptcha()
+})
 </script>
 
 <style scoped>
@@ -453,6 +658,30 @@ const handleTermsClick = () => {
 /* 登录表单 */
 .login-form {
   text-align: left;
+}
+
+/* 验证码行样式 */
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.captcha-input {
+  flex: 1;
+}
+
+.captcha-img {
+  width: 120px;
+  height: 40px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.captcha-img:hover {
+  border-color: #3b82f6;
 }
 
 .login-input {
@@ -534,6 +763,61 @@ const handleTermsClick = () => {
 .cancel-button:hover {
   color: #374151;
   background-color: #f9fafb;
+}
+
+/* 用户协议和链接区域 */
+.terms-and-links {
+  margin-bottom: 20px;
+}
+
+.form-links {
+  text-align: center;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.link {
+  color: #3b82f6;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.3s;
+}
+
+.link:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.separator {
+  margin: 0 12px;
+  color: #d1d5db;
+}
+
+/* 调试信息样式 */
+.debug-info {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.debug-info h4 {
+  margin: 0 0 8px 0;
+  color: #333;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.debug-info pre {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #666;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 /* 底部技术支持 */

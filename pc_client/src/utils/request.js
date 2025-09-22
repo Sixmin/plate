@@ -6,11 +6,21 @@
 
 import axios from 'axios'
 import { message, Modal } from 'ant-design-vue'
-import { getToken, clearAuth } from '@/utils/auth'
+import { getToken, clearAuth, useAuthStoreOutside } from '@/stores/auth'
 import { getErrorMessage } from '@/utils/errorCode'
+import { generateAesKey, encryptBase64, encryptWithAes, decryptBase64, decryptWithAes } from '@/utils/encryption/crypto'
+import { encrypt as encryptRsa, decrypt as decryptRsa } from '@/utils/encryption/jsencrypt'
 
 // 重新登录控制标识，防止多次弹出登录对话框
 export let isRelogin = { show: false }
+
+/**
+ * 重置登录状态标识
+ * 用于在特定情况下手动重置，避免无限循环
+ */
+export function resetLoginStatus() {
+  isRelogin.show = false
+}
 
 // 设置axios默认配置
 axios.defaults.headers['Content-Type'] = 'application/json;charset=utf-8'
@@ -24,11 +34,13 @@ const service = axios.create({
 })
 
 /**
- * 请求拦截器
+ * 请求拦截器（企业级版本，对齐client项目）
  * 功能：在请求发送前进行统一处理
  * 1. 自动添加token到请求头
- * 2. 处理GET请求参数
- * 3. 防重复提交控制（后续可扩展）
+ * 2. 添加客户端ID到请求头
+ * 3. 处理GET请求参数
+ * 4. 添加语言信息到请求头
+ * 5. 请求加密处理
  */
 service.interceptors.request.use(
   config => {
@@ -40,12 +52,71 @@ service.interceptors.request.use(
       config.headers['Authorization'] = 'Bearer ' + getToken()
     }
 
+    // 添加客户端ID到请求头（对齐client项目）
+    const clientId = import.meta.env.VITE_GLOB_APP_CLIENT_ID
+    if (clientId) {
+      config.headers['ClientID'] = clientId
+    }
+
+    // 添加语言信息到请求头（对齐client项目）
+    config.headers['Accept-Language'] = 'zh_CN'
+    config.headers['Content-Language'] = 'zh_CN'
+
+    // 加密处理逻辑（对齐主客户端实现）
+    const enableEncrypt = import.meta.env.VITE_GLOB_ENABLE_ENCRYPT === 'true'
+    const { encrypt } = config
+    
+    // 验证码等接口白名单（不需要加密）
+    const encryptWhitelist = ['/auth/code', '/captchaImage', '/auth/tenant/list']
+    const isWhitelisted = encryptWhitelist.some(path => config.url?.includes(path))
+    
+    // 全局开启请求加密功能 && 该请求开启 && 是post/put请求 && 不在白名单中
+    if (
+      enableEncrypt &&
+      encrypt &&
+      ['POST', 'PUT'].includes(config.method?.toUpperCase() || '') &&
+      !isWhitelisted
+    ) {
+      try {
+        const aesKey = generateAesKey()
+        const encryptedAesKey = encryptRsa(encryptBase64(aesKey))
+        
+        if (encryptedAesKey) {
+          config.headers['encrypt-key'] = encryptedAesKey
+          
+          // 加密请求数据
+          const dataToEncrypt = typeof config.data === 'object' 
+            ? JSON.stringify(config.data) 
+            : config.data
+          
+          config.data = encryptWithAes(dataToEncrypt, aesKey)
+          
+          console.log('PC Client 请求已加密', {
+            url: config.url,
+            hasEncryptKey: !!config.headers['encrypt-key']
+          })
+        } else {
+          console.error('RSA加密失败，使用原始数据')
+        }
+      } catch (error) {
+        console.error('请求加密处理失败:', error)
+      }
+    }
+
     // GET请求参数处理：将params对象转为URL查询字符串
     if (config.method === 'get' && config.params) {
       let url = config.url + '?' + new URLSearchParams(config.params).toString()
       config.params = {}
       config.url = url
     }
+
+    console.log('PC Client 请求配置:', {
+      url: config.url,
+      method: config.method,
+      headers: config.headers,
+      dataLength: config.data ? config.data.length : 0,
+      isEncrypted: !!config.headers['encrypt-key']
+    })
 
     return config
   },
@@ -57,14 +128,38 @@ service.interceptors.request.use(
 
 /**
  * 响应拦截器
- * 功能：统一处理响应结果
- * 1. 根据状态码判断请求结果
- * 2. 处理token失效情况
- * 3. 统一错误提示
- * 4. 返回处理后的数据
+ * 功能：统一处理响应结果，适配主项目R<T>格式
+ * 1. 响应解密处理
+ * 2. 标准化响应格式处理
+ * 3. 统一错误码映射和处理
+ * 4. Token失效自动处理
+ * 5. 登录接口特殊处理
  */
 service.interceptors.response.use(
   response => {
+    // 响应解密处理（对齐主客户端实现）
+    const encryptKey = (response.headers ?? {})['encrypt-key']
+    if (encryptKey) {
+      try {
+        // RSA私钥解密 拿到解密秘钥的base64
+        const base64Str = decryptRsa(encryptKey)
+        if (base64Str) {
+          // base64 解码 得到请求头的 AES 秘钥
+          const aesSecret = decryptBase64(base64Str.toString())
+          // 使用aesKey解密 responseData
+          const decryptData = decryptWithAes(response.data, aesSecret)
+          // 赋值 需要转为对象
+          response.data = JSON.parse(decryptData)
+          
+          console.log('PC Client 响应已解密')
+        } else {
+          console.error('RSA解密失败')
+        }
+      } catch (error) {
+        console.error('响应解密处理失败:', error)
+      }
+    }
+
     // 获取响应数据
     const { data } = response
     const code = data.code || 200
@@ -82,80 +177,50 @@ service.interceptors.response.use(
       response.config.url.endsWith('/login')
     )
 
-    // 调试信息：记录请求URL和是否为登录请求
-    if (response.config.url && response.config.url.includes('login')) {
-      console.log('检测到登录相关请求 - URL:', response.config.url, '是否为登录请求:', isLoginRequest)
-    }
-
-    // 处理各种状态码
-    if (code === 401) {
+    // 简化响应处理，对齐playground版本
+    if (code === 200) {
+      // 成功响应，根据data存在情况决定返回格式
+      return Promise.resolve(data.data || data)
+    } else if (code === 401) {
       // 对于登录接口的401错误，直接返回让业务层处理
       if (isLoginRequest) {
-        console.log('登录接口401错误，返回data:', data)
         return Promise.reject(data)
       }
-
-      // token失效，需要重新登录
-      // if (!isRelogin.show) {
-      //   isRelogin.show = true
-      //   Modal.confirm({
-      //     title: '系统提示',
-      //     content: '登录状态已过期，您可以继续留在该页面，或者重新登录',
-      //     okText: '重新登录',
-      //     cancelText: '取消',
-      //     onOk: () => {
-      //       isRelogin.show = false
-      //       // 导入authStore需要在回调中动态导入，避免循环依赖
-      //       import('@/stores/auth').then(({ useAuthStore }) => {
-      //         const authStore = useAuthStore()
-      //         authStore.logout().then(() => {
-      //           window.location.reload()
-      //         })
-      //       })
-      //     },
-      //     onCancel: () => {
-      //       isRelogin.show = false
-      //     }
-      //   })
-      // }
-      // return Promise.reject(new Error('无效的会话，或者会话已过期，请重新登录'))
+      
+      // Token失效，清理状态，让路由守卫处理跳转
+      if (!isRelogin.show) {
+        isRelogin.show = true
+        const authStore = useAuthStoreOutside()
+        authStore.resetAuthState()
+        // 不在这里显示错误消息，让路由守卫统一处理
+        // 重置标记，允许后续请求正常处理
+        setTimeout(() => {
+          isRelogin.show = false
+        }, 1000)
+      }
+      return Promise.reject(new Error(msg || '登录状态已过期'))
     } else if (code === 500) {
       // 对于登录接口的500错误，让业务层处理
       if (isLoginRequest) {
-        console.log('登录接口500错误，返回data:', data)
         return Promise.reject(data)
       }
-      if(msg.includes('接口配置不存在: conversations')){
-          message.error('该服务暂未开放，敬请期待~')
-          return
+      
+      // 简化服务器错误处理
+      const errorMsg = msg || '服务器繁忙，请稍后重试'
+      if (!isLoginRequest) {
+        message.error(errorMsg)
       }
-      if(msg.includes('接口配置不存在: messages')){
-          return
-      }
-      // 服务器错误
-      message.error(msg)
-      return Promise.reject(new Error(msg))
-    } else if (code === 601) {
-      // 对于登录接口的业务错误，让业务层处理
-      if (isLoginRequest) {
-        console.log('登录接口601错误，返回data:', data)
-        return Promise.reject(data)
-      }
-      // 业务逻辑错误，使用警告提示
-      message.warning(msg)
-      return Promise.reject(new Error(msg))
-    } else if (code !== 200) {
+      return Promise.reject(new Error(errorMsg))
+    } else {
       // 对于登录接口的其他错误，让业务层处理
       if (isLoginRequest) {
-        console.log('登录接口其他错误，code:', code, 'data:', data)
         return Promise.reject(data)
       }
-      // 其他错误
-      message.error(msg)
-      return Promise.reject(new Error('请求失败'))
-    } else {
-      // 请求成功，返回数据
-      return Promise.resolve(data)
+      
+      // 其他错误统一处理
+      const errorMsg = msg || '请求处理失败'
+      message.error(errorMsg)
+      return Promise.reject(new Error(errorMsg))
     }
   },
   error => {

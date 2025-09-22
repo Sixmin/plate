@@ -7,23 +7,42 @@
 import request from '@/utils/request'
 
 /**
- * 用户登录
+ * 用户登录（企业级认证版本，对齐client项目）
  * @param {Object} data 登录数据
  * @param {string} data.username 用户名
  * @param {string} data.password 密码
  * @param {string} data.code 验证码
  * @param {string} data.uuid 验证码UUID
+ * @param {string} data.tenantId 租户ID（可选，优先使用传入值）
  * @returns {Promise} 登录结果，包含token信息
  */
 export function login(data) {
+  // 企业级登录参数，对齐client项目标准格式
+  const loginData = {
+    username: data.username,
+    password: data.password,
+    // 授权类型，固定为密码模式
+    grantType: 'password',
+    // 租户ID：优先使用传入值，否则使用环境变量默认值
+    tenantId: data.tenantId || import.meta.env.VITE_DEFAULT_TENANT_ID || '000000',
+    // 客户端ID：从环境变量获取，与主项目保持一致
+    clientId: import.meta.env.VITE_GLOB_APP_CLIENT_ID,
+    // 可选参数：只在有值时添加
+    ...(data.code && { code: data.code }),
+    ...(data.uuid && { uuid: data.uuid })
+  }
+  
+  console.log('PC Client 登录参数:', loginData)
+  
   return request({
-    url: '/login',                    // 修正：去掉/auth前缀，与后端接口路径一致
+    url: '/auth/login',               // 与client项目路径一致
     headers: {
       isToken: false,                 // 登录接口不需要token
       repeatSubmit: false            // 允许重复提交（用户可能多次点击）
     },
     method: 'post',
-    data: data
+    data: loginData,
+    encrypt: true
   })
 }
 
@@ -52,11 +71,19 @@ export function register(data) {
  * 获取用户信息
  * @returns {Promise} 用户信息，包含用户详情、角色、权限等
  */
-export function getInfo() {
+export function getUserInfo() {
   return request({
-    url: '/getInfo',                  // 修正：去掉/auth前缀，与后端接口路径一致
+    url: '/system/user/getInfo',      // 修正：与后端实际接口路径一致 /system/user/getInfo
     method: 'get'
   })
+}
+
+/**
+ * 获取用户信息（向后兼容的别名）
+ * @returns {Promise} 用户信息，包含用户详情、角色、权限等
+ */
+export function getInfo() {
+  return getUserInfo()
 }
 
 /**
@@ -65,7 +92,7 @@ export function getInfo() {
  */
 export function logout() {
   return request({
-    url: '/logout',                   // 修正：去掉/auth前缀，与后端接口路径一致
+    url: '/auth/logout',              // 修正：与主项目AuthController路径一致
     method: 'post'
   })
 }
@@ -76,7 +103,7 @@ export function logout() {
  */
 export function getCaptcha() {
   return request({
-    url: '/captchaImage',             // 修正：去掉/auth前缀，与后端接口路径一致
+    url: '/auth/code',                // 修正：与后端实际接口路径一致 /auth/code
     headers: {
       isToken: false                  // 获取验证码不需要token
     },
@@ -92,7 +119,7 @@ export function getCaptcha() {
  */
 export function refreshToken(refreshToken) {
   return request({
-    url: '/refresh',                  // 修正：去掉/auth前缀，与后端接口路径一致
+    url: '/auth/refresh',             // 修正：与主项目路径规范保持一致
     method: 'post',
     data: { refreshToken }
   })
@@ -219,6 +246,39 @@ export function uploadAvatar(formData) {
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+// ========== 企业级多租户相关API ==========
+
+/**
+ * 获取租户列表（用于登录页面租户选择）
+ * @returns {Promise} 租户列表，包含租户信息
+ */
+export function getTenantList() {
+  return request({
+    url: '/auth/tenant/list',
+    headers: {
+      isToken: false  // 获取租户列表不需要token
+    },
+    method: 'get'
+  })
+}
+
+/**
+ * 获取租户信息（根据域名自动识别）
+ * @returns {Promise} 当前域名对应的租户信息
+ */
+export function getTenantInfo() {
+  return request({
+    url: '/auth/tenant/info',
+    headers: {
+      isToken: false  // 获取租户信息不需要token
+    },
+    method: 'get',
+    params: {
+      domain: window.location.host
     }
   })
 } 

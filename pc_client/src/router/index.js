@@ -21,6 +21,18 @@ const routes = [
     }
   },
   {
+    path: '/login',
+    name: 'Login',
+    redirect: () => {
+      // 重定向到首页，并通过query参数标记需要显示登录模态框
+      return { path: '/', query: { showLogin: 'true' } }
+    },
+    meta: {
+      title: '用户登录',
+      requiresAuth: false  // 登录页面不需要认证
+    }
+  },
+  {
     path: '/chat',
     name: 'Chat',
     component: () => import('@/views/ChatView.vue'),

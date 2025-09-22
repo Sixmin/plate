@@ -1,34 +1,114 @@
 /**
  * 认证状态管理模块
  * 功能：基于Pinia管理用户认证状态，包括登录、注销、权限检查等
- * 参考管理端user.js，适配PC端需求
+ * 集成localStorage操作，统一认证管理
  */
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { message } from 'ant-design-vue'
 
-// 导入认证相关工具函数
-import { 
-  getToken, 
-  setToken, 
-  removeToken,
-  getUserInfo, 
-  setUserInfo, 
-  removeUserInfo,
-  clearAuth 
-} from '@/utils/auth'
-
 // 导入认证相关API
 import { 
   login, 
   logout, 
-  getInfo,
+  getUserInfo as getUserInfoAPI,
   refreshToken 
 } from '@/api/auth'
 
 // 导入错误处理工具
 import { getLoginErrorMessage } from '@/utils/errorCode'
+
+// ========== localStorage 操作常量和函数 ==========
+// 存储key的常量定义
+const TOKEN_KEY = 'PC-Client-Token'              // 访问token的存储key
+const REFRESH_TOKEN_KEY = 'PC-Client-Refresh-Token'  // 刷新token的存储key  
+const USER_INFO_KEY = 'PC-Client-User-Info'      // 用户信息的存储key
+
+/**
+ * 获取访问token
+ * @returns {string|null} token字符串或null
+ */
+function getTokenFromStorage() {
+  return localStorage.getItem(TOKEN_KEY)
+}
+
+/**
+ * 设置访问token
+ * @param {string} token - 要存储的token
+ */
+function setTokenToStorage(token) {
+  localStorage.setItem(TOKEN_KEY, token)
+}
+
+/**
+ * 移除访问token
+ */
+function removeTokenFromStorage() {
+  localStorage.removeItem(TOKEN_KEY)
+}
+
+/**
+ * 获取刷新token
+ * @returns {string|null} refresh token字符串或null
+ */
+function getRefreshTokenFromStorage() {
+  return localStorage.getItem(REFRESH_TOKEN_KEY)
+}
+
+/**
+ * 设置刷新token
+ * @param {string} token - 要存储的refresh token
+ */
+function setRefreshTokenToStorage(token) {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token)
+}
+
+/**
+ * 移除刷新token
+ */
+function removeRefreshTokenFromStorage() {
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
+}
+
+/**
+ * 获取缓存的用户信息
+ * @returns {Object|null} 用户信息对象或null
+ */
+function getUserInfoFromStorage() {
+  const info = localStorage.getItem(USER_INFO_KEY)
+  try {
+    return info ? JSON.parse(info) : null
+  } catch (error) {
+    console.error('解析用户信息失败:', error)
+    return null
+  }
+}
+
+/**
+ * 设置用户信息到缓存
+ * @param {Object} userInfo - 用户信息对象
+ */
+function setUserInfoToStorage(userInfo) {
+  localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
+}
+
+/**
+ * 移除用户信息缓存
+ */
+function removeUserInfoFromStorage() {
+  localStorage.removeItem(USER_INFO_KEY)
+}
+
+/**
+ * 清空所有认证相关信息
+ * 用于用户注销时彻底清理本地存储
+ */
+function clearAuthFromStorage() {
+  removeTokenFromStorage()
+  removeRefreshTokenFromStorage()
+  removeUserInfoFromStorage()
+}
 
 /**
  * 认证状态管理Store
@@ -41,13 +121,13 @@ export const useAuthStore = defineStore('auth', () => {
    * 用户访问token
    * @type {string|null}
    */
-  const token = ref(getToken())
+  const token = ref(getTokenFromStorage())
   
   /**
    * 用户基本信息
    * @type {Object|null}
    */
-  const userInfo = ref(getUserInfo())
+  const userInfo = ref(getUserInfoFromStorage())
   
   /**
    * 用户角色列表
@@ -112,31 +192,53 @@ export const useAuthStore = defineStore('auth', () => {
   // ========== 方法定义 ==========
 
   /**
-   * 用户登录
+   * 用户登录（企业级认证版本，对齐client项目）
    * @param {Object} loginForm 登录表单数据
    * @param {string} loginForm.username 用户名
    * @param {string} loginForm.password 密码
    * @param {string} loginForm.code 验证码
    * @param {string} loginForm.uuid 验证码UUID
+   * @param {string} loginForm.tenantId 租户ID（可选）
    * @returns {Promise} 登录结果
    */
   async function loginAction(loginForm) {
     try {
       const response = await login(loginForm)
       
-      // 后端返回的token信息，根据实际后端响应格式调整
-      const tokenValue = response.token || response.data?.token
+      // 企业级Token获取逻辑，对齐client项目格式
+      // client项目使用 access_token，pc_client之前使用 accessToken
+      const accessToken = response.access_token || response.accessToken
+      const refreshToken = response.refresh_token || response.refreshToken
+      const clientId = response.client_id || response.clientId
+      const expireIn = response.expire_in || response.expireIn
       
-      if (tokenValue) {
+      console.log('PC Client 登录响应:', response)
+      console.log('提取的token信息:', { accessToken, refreshToken, clientId, expireIn })
+      
+      if (accessToken) {
         // 保存token到状态和本地存储
-        token.value = tokenValue
-        setToken(tokenValue)
+        token.value = accessToken
+        setTokenToStorage(accessToken)
         
-        // message.success('登录成功')
-        return Promise.resolve()
+        // 保存refreshToken（如果有）
+        if (refreshToken) {
+          setRefreshTokenToStorage(refreshToken)
+        }
+        
+        // 登录成功后获取用户信息（参考client项目版本）
+        try {
+          await getUserInfoAction()
+          console.log('用户信息获取成功')
+        } catch (userInfoError) {
+          console.warn('获取用户信息失败，但登录成功:', userInfoError)
+          // 用户信息获取失败不影响登录流程，但要记录错误
+        }
+        
+        message.success('登录成功')
+        return Promise.resolve(response)
       } else {
         // 登录接口调用成功但没有返回token，通常是业务逻辑错误
-        const errorMsg = response.msg || '用户名或密码错误'
+        const errorMsg = response.msg || response.message || '用户名或密码错误'
         const friendlyMsg = getLoginErrorMessage(errorMsg)
         message.error(friendlyMsg)
         return Promise.reject(new Error(errorMsg))
@@ -199,28 +301,73 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * 获取用户信息
+   * 获取用户信息（企业级认证版本，对齐client项目）
    * @returns {Promise} 用户信息
    */
   async function getUserInfoAction() {
     try {
-      const response = await getInfo()
+      const response = await getUserInfoAPI()
       
-      if (response && response.user) {
-        // 保存用户信息
-        userInfo.value = response.user
-        setUserInfo(response.user)
+      console.log('PC Client 用户信息响应:', response)
+      
+      // 企业级用户信息处理，对齐client项目格式
+      if (response) {
+        let userData = null
+        let userRoles = []
+        let userPermissions = []
         
-        // 保存角色和权限
-        roles.value = response.roles || []
-        permissions.value = response.permissions || []
+        // 适配不同的响应格式
+        if (response.user) {
+          // 格式1: { user: {...}, roles: [...], permissions: [...] }
+          userData = response.user
+          userRoles = response.roles || []
+          userPermissions = response.permissions || []
+        } else if (response.data && response.data.user) {
+          // 格式2: { data: { user: {...}, roles: [...], permissions: [...] } }
+          userData = response.data.user
+          userRoles = response.data.roles || []
+          userPermissions = response.data.permissions || []
+        } else if (response.userName || response.nickName) {
+          // 格式3: 直接的用户对象
+          userData = response
+          userRoles = response.roles || []
+          userPermissions = response.permissions || []
+        } else {
+          // 格式4: 其他格式，尝试直接使用
+          userData = response
+          userRoles = []
+          userPermissions = []
+        }
         
-        return Promise.resolve(response)
-      } else {
-        return Promise.reject(new Error('获取用户信息失败'))
+        if (userData) {
+          // 保存用户信息
+          userInfo.value = userData
+          setUserInfoToStorage(userData)
+          
+          // 保存角色和权限
+          roles.value = userRoles
+          permissions.value = userPermissions
+          
+          console.log('保存的用户信息:', {
+            user: userData,
+            roles: userRoles,
+            permissions: userPermissions
+          })
+          
+          return Promise.resolve(response)
+        }
       }
+      
+      return Promise.reject(new Error('获取用户信息失败：响应格式不正确'))
     } catch (error) {
       console.error('获取用户信息失败:', error)
+      
+      // 如果是401错误，可能是token过期
+      if (error.response && error.response.status === 401) {
+        console.warn('用户信息获取失败：可能是token过期')
+        resetAuthState()
+      }
+      
       return Promise.reject(error)
     }
   }
@@ -255,7 +402,7 @@ export const useAuthStore = defineStore('auth', () => {
     permissions.value = []
     
     // 清理本地存储
-    clearAuth()
+    clearAuthFromStorage()
   }
 
   /**
@@ -316,8 +463,8 @@ export const useAuthStore = defineStore('auth', () => {
    * 功能：页面刷新时从localStorage恢复状态
    */
   function restoreAuthState() {
-    const cachedToken = getToken()
-    const cachedUserInfo = getUserInfo()
+    const cachedToken = getTokenFromStorage()
+    const cachedUserInfo = getUserInfoFromStorage()
     
     if (cachedToken && cachedUserInfo) {
       token.value = cachedToken
@@ -383,4 +530,84 @@ export const useAuthStore = defineStore('auth', () => {
  */
 export function useAuthStoreOutside() {
   return useAuthStore()
+}
+
+// ========== 兼容性导出函数 ==========
+// 提供与原utils/auth.js相同的API，保持向后兼容
+
+/**
+ * 获取访问token (兼容性函数)
+ * @returns {string|null} token字符串或null
+ */
+export function getToken() {
+  return getTokenFromStorage()
+}
+
+/**
+ * 设置访问token (兼容性函数)
+ * @param {string} token - 要存储的token
+ */
+export function setToken(token) {
+  setTokenToStorage(token)
+}
+
+/**
+ * 移除访问token (兼容性函数)
+ */
+export function removeToken() {
+  removeTokenFromStorage()
+}
+
+/**
+ * 获取刷新token (兼容性函数)
+ * @returns {string|null} refresh token字符串或null
+ */
+export function getRefreshToken() {
+  return getRefreshTokenFromStorage()
+}
+
+/**
+ * 设置刷新token (兼容性函数)
+ * @param {string} token - 要存储的refresh token
+ */
+export function setRefreshToken(token) {
+  setRefreshTokenToStorage(token)
+}
+
+/**
+ * 移除刷新token (兼容性函数)
+ */
+export function removeRefreshToken() {
+  removeRefreshTokenFromStorage()
+}
+
+/**
+ * 获取缓存的用户信息 (兼容性函数)
+ * @returns {Object|null} 用户信息对象或null
+ */
+export function getUserInfo() {
+  return getUserInfoFromStorage()
+}
+
+/**
+ * 设置用户信息到缓存 (兼容性函数)
+ * @param {Object} userInfo - 用户信息对象
+ */
+export function setUserInfo(userInfo) {
+  setUserInfoToStorage(userInfo)
+}
+
+/**
+ * 移除用户信息缓存 (兼容性函数)
+ */
+export function removeUserInfo() {
+  removeUserInfoFromStorage()
+}
+
+/**
+ * 清空所有认证相关信息 (兼容性函数)
+ * 用于用户注销时彻底清理本地存储
+ */
+export function clearAuth() {
+  clearAuthFromStorage()
 } 

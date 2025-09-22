@@ -5,8 +5,7 @@
  */
 
 import router from '@/router'
-import { useAuthStore } from '@/stores/auth'
-import { getToken } from '@/utils/auth'
+import { useAuthStore, getToken } from '@/stores/auth'
 import { message } from 'ant-design-vue'
 
 /**
@@ -37,9 +36,14 @@ function isWhiteList(path) {
  * @returns {boolean} 是否有权限
  */
 function hasRoutePermission(route, authStore) {
-  // 如果路由没有权限要求，允许访问
-  if (!route.meta?.requiresAuth) {
+  // 如果路由明确设置不需要权限，允许访问
+  if (route.meta?.requiresAuth === false) {
     return true
+  }
+
+  // 如果没有权限要求配置，默认需要登录
+  if (route.meta?.requiresAuth === undefined) {
+    return authStore.isLoggedIn
   }
 
   // 检查是否需要特定权限
@@ -83,32 +87,42 @@ export function setupRouterGuard() {
         // 已登录用户访问登录页，重定向到首页
         next({ path: '/' })
       } else {
-        // 检查是否已获取用户信息
-        if (!authStore.userInfo) {
-          try {
-            // 获取用户信息
-            await authStore.getUserInfoAction()
-            
-            // 检查路由权限
-            if (hasRoutePermission(to, authStore)) {
-              next()
-            } else {
-              // 没有权限，跳转到403页面
-              message.error('您没有权限访问该页面')
-              next({ path: '/403' })
-            }
-          } catch (error) {
-            console.error('获取用户信息失败:', error)
-            // 获取用户信息失败，清除token并跳转到登录页
-            authStore.resetAuthState()
-            message.error('登录状态异常，请重新登录')
-            next(`/login?redirect=${to.path}`)
-          }
+        // 先检查路由权限，如果不需要登录则直接通过
+        if (hasRoutePermission(to, authStore)) {
+          next()
         } else {
-          // 已有用户信息，直接检查权限
-          if (hasRoutePermission(to, authStore)) {
-            next()
+          // 需要权限验证，检查是否已获取用户信息
+          if (!authStore.userInfo) {
+            try {
+              // 获取用户信息
+              await authStore.getUserInfoAction()
+              
+              // 重新检查路由权限
+              if (hasRoutePermission(to, authStore)) {
+                next()
+              } else {
+                // 没有权限，跳转到403页面
+                message.error('您没有权限访问该页面')
+                next({ path: '/403' })
+              }
+            } catch (error) {
+              console.error('获取用户信息失败:', error)
+              // 获取用户信息失败，清除token并跳转到登录页
+              authStore.resetAuthState()
+              
+              // 如果是不需要认证的页面，直接通过
+              if (to.meta?.requiresAuth === false) {
+                next()
+              } else {
+                // 只有在非首页时才显示错误消息，避免重复提示
+                if (to.path !== '/') {
+                  message.error('登录状态异常，请重新登录')
+                }
+                next(`/login?redirect=${to.path}`)
+              }
+            }
           } else {
+            // 已有用户信息，但权限不足
             message.error('您没有权限访问该页面')
             next({ path: '/403' })
           }

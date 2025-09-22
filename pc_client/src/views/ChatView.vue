@@ -738,10 +738,14 @@ import UserHeader from '@/components/UserHeader.vue'
 import AiMessageRenderer from '@/components/AiMessageRenderer.vue'
 import WorkbenchModule from '@/components/WorkbenchModule.vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import LoginModal from '@/components/LoginModal.vue'
 
 // 获取认证状态
 const authStore = useAuthStore()
+
+// 路由对象
+const router = useRouter()
 
 // 工作台导航处理
 const handleWorkbenchNavigate = (path) => {
@@ -2341,6 +2345,13 @@ watch(() => authStore.isLoggedIn, async (newLoginStatus, oldLoginStatus) => {
 // 生命周期
 onMounted(async () => {
   await loadAgents()
+  
+  // 检查是否需要显示登录模态框（来自路由重定向）
+  if (router.currentRoute.value.query.showLogin === 'true') {
+    loginModalVisible.value = true
+    // 清除 query 参数，避免刷新页面时重复显示
+    router.replace({ path: '/', query: {} })
+  }
   
   // 如果有智能体，默认选择第一个并加载最新对话
   if (agentList.value.length > 0) {
