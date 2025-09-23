@@ -35,10 +35,10 @@
 <!--            <artifactId>orai18n</artifactId>-->
 <!--        </dependency>-->
 <!--        &lt;!&ndash; PostgreSql &ndash;&gt;-->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.postgresql</groupId>-->
+<!--            <artifactId>postgresql</artifactId>-->
+<!--        </dependency>-->
 <!--        &lt;!&ndash; SqlServer &ndash;&gt;-->
 <!--        <dependency>-->
 <!--            <groupId>com.microsoft.sqlserver</groupId>-->
