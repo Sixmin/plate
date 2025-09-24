@@ -77,6 +77,49 @@
             <artifactId>ruoyi-common-ratelimiter</artifactId>
         </dependency>
 
+        <!-- AI 核心依赖 - 基于Context7研究，调整为实际可用版本 -->
+        <!-- LangChain4j Spring Boot 核心启动器 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-spring-boot-starter</artifactId>
+            <version>0.36.2</version>
+        </dependency>
+
+        <!-- LangChain4j 核心库 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j</artifactId>
+            <version>0.36.2</version>
+        </dependency>
+
+        <!-- Qdrant Java 客户端 -->
+        <dependency>
+            <groupId>io.qdrant</groupId>
+            <artifactId>client</artifactId>
+            <version>1.12.0</version>
+        </dependency>
+
+        <!-- LangChain4j Qdrant 集成 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-qdrant</artifactId>
+            <version>0.36.2</version>
+        </dependency>
+
+        <!-- LangChain4j OpenAI 集成 (支持多模型) -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>0.36.2</version>
+        </dependency>
+
+        <!-- LangChain4j Ollama 本地模型支持 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-ollama</artifactId>
+            <version>0.36.2</version>
+        </dependency>
+
     </dependencies>
 
 </project>
