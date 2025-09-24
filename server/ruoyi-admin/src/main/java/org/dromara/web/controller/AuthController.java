@@ -213,7 +213,13 @@ public class AuthController {
         }
 
         List<SysTenantVo> tenantList = tenantService.queryList(new SysTenantBo());
-        List<TenantListVo> voList = MapstructUtils.convert(tenantList, TenantListVo.class);
+        List<TenantListVo> voList = tenantList.stream().map(tenant -> {
+            TenantListVo vo = new TenantListVo();
+            vo.setTenantId(tenant.getTenantId());
+            vo.setCompanyName(tenant.getCompanyName());
+            vo.setDomain(tenant.getDomain());
+            return vo;
+        }).collect(java.util.stream.Collectors.toList());
         try {
             // 如果只超管返回所有租户
             if (LoginHelper.isSuperAdmin()) {
