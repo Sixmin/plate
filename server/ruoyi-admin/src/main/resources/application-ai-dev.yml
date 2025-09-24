@@ -1,0 +1,89 @@
+# AI模块开发环境配置
+# 基于AI-001完整基础架构，支持LangChain4j + Qdrant企业级集成
+
+ai:
+  # AI模块启用状态
+  enabled: true
+  
+  # AI核心配置域
+  core:
+    default-provider: openai
+    api-key: ${AI_API_KEY:your-openai-api-key-here}
+    base-url: https://api.openai.com/v1
+    timeout: 60
+    max-retries: 3
+
+  # LangChain4j配置域
+  langchain4j:
+    chat-model:
+      model-name: gpt-3.5-turbo
+      temperature: 0.7
+      max-tokens: 4000
+      streaming-enabled: true
+    embedding-model:
+      model-name: text-embedding-ada-002
+      batch-size: 100
+      dimensions: 1536
+
+  # Qdrant向量数据库配置域
+  qdrant:
+    host: localhost
+    port: 6334
+    use-tls: false
+    api-key: ${QDRANT_API_KEY:}
+    default-collection-name: ai_knowledge_base_dev
+    distance-function: Cosine
+    pool:
+      max-connections: 5
+      connect-timeout-ms: 5000
+      idle-timeout-ms: 300000
+
+  # 模型配置域
+  model:
+    local:
+      enabled: true
+      base-url: http://localhost:11434
+      default-model: llama2
+      download-timeout: 3600
+    cloud:
+      openai:
+        enabled: true
+        api-key: ${AI_API_KEY:your-openai-api-key-here}
+        organization-id: ${OPENAI_ORG_ID:}
+        proxy-host: ${OPENAI_PROXY_HOST:}
+        proxy-port: ${OPENAI_PROXY_PORT:0}
+      dashscope:
+        enabled: false
+        api-key: ${DASHSCOPE_API_KEY:}
+        workspace: ${DASHSCOPE_WORKSPACE:}
+
+  # 缓存配置域
+  cache:
+    enabled: true
+    chat-cache-ttl: 1800  # 开发环境缓存时间较短
+    embedding-cache-ttl: 43200
+    max-cache-size: 5000  # 开发环境缓存容量较小
+    eviction-policy: LRU
+
+  # 监控配置域
+  monitor:
+    enabled: true
+    metrics:
+      response-time: true
+      token-usage: true
+      error-rate: true
+      export-interval: 30  # 开发环境更频繁的监控
+    health-check:
+      interval: 15  # 开发环境更频繁的健康检查
+      timeout: 5
+      failure-threshold: 2
+      recovery-threshold: 1
+
+# 开发环境日志配置
+logging:
+  level:
+    org.dromara.ai: DEBUG
+    dev.langchain4j: DEBUG
+    io.qdrant: INFO
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:%5p}) %clr([AI]){blue} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:%wEx}"

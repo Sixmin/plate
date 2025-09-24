@@ -1,0 +1,109 @@
+# AI模块测试环境配置
+# 用于集成测试、性能测试和预发布验证
+
+ai:
+  # AI模块启用状态
+  enabled: true
+  
+  # AI核心配置域
+  core:
+    default-provider: openai
+    api-key: ${AI_API_KEY_TEST:test-api-key}  # 测试环境专用API密钥
+    base-url: https://api.openai.com/v1
+    timeout: 90
+    max-retries: 3
+
+  # LangChain4j配置域
+  langchain4j:
+    chat-model:
+      model-name: gpt-3.5-turbo  # 测试环境使用成本较低的模型
+      temperature: 0.5           # 测试环境中等参数
+      max-tokens: 4000
+      streaming-enabled: true
+    embedding-model:
+      model-name: text-embedding-ada-002
+      batch-size: 200            # 测试环境中等批量
+      dimensions: 1536
+
+  # Qdrant向量数据库配置域
+  qdrant:
+    host: ${QDRANT_HOST:localhost}
+    port: 6334
+    use-tls: false             # 测试环境简化配置
+    api-key: ${QDRANT_API_KEY_TEST:}
+    default-collection-name: ai_knowledge_base_test
+    distance-function: Cosine
+    pool:
+      max-connections: 10      # 测试环境中等连接池
+      connect-timeout-ms: 8000
+      idle-timeout-ms: 400000
+
+  # 模型配置域
+  model:
+    local:
+      enabled: true            # 测试环境启用本地模型进行测试
+      base-url: http://localhost:11434
+      default-model: llama2
+      download-timeout: 3600
+    cloud:
+      openai:
+        enabled: true
+        api-key: ${AI_API_KEY_TEST:test-api-key}
+        organization-id: ${OPENAI_ORG_ID_TEST:}
+        proxy-host: ${OPENAI_PROXY_HOST:}
+        proxy-port: ${OPENAI_PROXY_PORT:0}
+      dashscope:
+        enabled: true          # 测试环境启用多模型进行兼容性测试
+        api-key: ${DASHSCOPE_API_KEY_TEST:}
+        workspace: ${DASHSCOPE_WORKSPACE_TEST:test}
+
+  # 缓存配置域
+  cache:
+    enabled: true
+    chat-cache-ttl: 3600       # 测试环境适中的缓存时间
+    embedding-cache-ttl: 21600
+    max-cache-size: 10000      # 测试环境适中的缓存容量
+    eviction-policy: LRU
+
+  # 监控配置域
+  monitor:
+    enabled: true
+    metrics:
+      response-time: true
+      token-usage: true        # 测试环境监控所有指标
+      error-rate: true
+      export-interval: 45      # 测试环境适中的监控间隔
+    health-check:
+      interval: 30             # 测试环境更频繁的健康检查
+      timeout: 10
+      failure-threshold: 2
+      recovery-threshold: 1
+
+# 测试环境日志配置
+logging:
+  level:
+    org.dromara.ai: INFO       # 测试环境平衡的日志级别
+    dev.langchain4j: INFO
+    io.qdrant: INFO
+  pattern:
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:%5p}) %clr([AI-TEST]){magenta} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:%wEx}"
+
+# 测试环境特殊配置
+test:
+  ai:
+    # 测试数据配置
+    mock-data-enabled: true
+    test-collection-prefix: test_
+    cleanup-after-test: true
+    
+    # 测试性能配置
+    performance-test:
+      enabled: true
+      max-concurrent-requests: 50
+      test-duration-minutes: 10
+      
+    # 集成测试配置
+    integration-test:
+      enabled: true
+      external-api-timeout: 30
+      retry-failed-tests: true

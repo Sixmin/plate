@@ -1,0 +1,108 @@
+# AI模块生产环境配置
+# 企业级生产部署，重点考虑性能、安全和监控
+
+ai:
+  # AI模块启用状态
+  enabled: true
+  
+  # AI核心配置域
+  core:
+    default-provider: openai
+    api-key: ENC(${AI_API_KEY_ENCRYPTED})  # 生产环境加密存储
+    base-url: https://api.openai.com/v1
+    timeout: 120  # 生产环境超时时间更长
+    max-retries: 5  # 生产环境更多重试
+
+  # LangChain4j配置域
+  langchain4j:
+    chat-model:
+      model-name: gpt-4  # 生产环境使用更强大的模型
+      temperature: 0.3   # 生产环境更保守的参数
+      max-tokens: 8000   # 生产环境更大的token限制
+      streaming-enabled: true
+    embedding-model:
+      model-name: text-embedding-ada-002
+      batch-size: 500    # 生产环境更大的批量处理
+      dimensions: 1536
+
+  # Qdrant向量数据库配置域
+  qdrant:
+    host: ${QDRANT_HOST:qdrant-cluster.internal}
+    port: 6334
+    use-tls: true      # 生产环境启用TLS
+    api-key: ENC(${QDRANT_API_KEY_ENCRYPTED})
+    default-collection-name: ai_knowledge_base_prod
+    distance-function: Cosine
+    pool:
+      max-connections: 20    # 生产环境更大的连接池
+      connect-timeout-ms: 10000
+      idle-timeout-ms: 600000
+
+  # 模型配置域
+  model:
+    local:
+      enabled: false  # 生产环境通常不启用本地模型
+      base-url: http://localhost:11434
+      default-model: llama2
+      download-timeout: 3600
+    cloud:
+      openai:
+        enabled: true
+        api-key: ENC(${AI_API_KEY_ENCRYPTED})
+        organization-id: ENC(${OPENAI_ORG_ID_ENCRYPTED})
+        proxy-host: ${OPENAI_PROXY_HOST:}
+        proxy-port: ${OPENAI_PROXY_PORT:0}
+      dashscope:
+        enabled: false  # 可选的备用模型
+        api-key: ENC(${DASHSCOPE_API_KEY_ENCRYPTED})
+        workspace: ${DASHSCOPE_WORKSPACE:}
+
+  # 缓存配置域
+  cache:
+    enabled: true
+    chat-cache-ttl: 7200     # 生产环境更长的缓存时间
+    embedding-cache-ttl: 86400
+    max-cache-size: 50000    # 生产环境更大的缓存容量
+    eviction-policy: LRU
+
+  # 监控配置域
+  monitor:
+    enabled: true
+    metrics:
+      response-time: true
+      token-usage: true      # 生产环境重点监控token使用
+      error-rate: true
+      export-interval: 60    # 生产环境标准监控间隔
+    health-check:
+      interval: 60           # 生产环境标准健康检查间隔
+      timeout: 15            # 生产环境更长的超时时间
+      failure-threshold: 3   # 生产环境更严格的失败阈值
+      recovery-threshold: 2
+
+# 生产环境日志配置
+logging:
+  level:
+    org.dromara.ai: INFO     # 生产环境减少日志详细程度
+    dev.langchain4j: WARN
+    io.qdrant: WARN
+    root: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [AI] %logger{50} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [AI] %logger{50} - %msg%n"
+
+# 生产环境安全配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus  # 只暴露必要的监控端点
+  endpoint:
+    health:
+      show-details: when-authorized  # 健康检查详情需要认证
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: plate-ai
+      environment: production
